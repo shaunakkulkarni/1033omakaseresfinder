@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1033 Omakase — Reservation Sniper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #09090b;
+      --surface:  #111113;
+      --surface2: #18181b;
+      --border:   #1f1f24;
+      --text:     #ddd5c8;
+      --muted:    #55545e;
+      --accent:   #c9a56a;
+      --accent-dim: rgba(201, 165, 106, 0.08);
+      --success:  #4a9c72;
+      --success-dim: rgba(74, 156, 114, 0.1);
+      --danger:   #c95252;
+      --danger-dim: rgba(201, 82, 82, 0.08);
+      --serif: 'Cormorant Garamond', Georgia, serif;
+      --mono:  'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      min-height: 100vh;
+      padding: 52px 20px 100px;
+    }
+
+    /* Grain overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+      z-index: 999;
+      opacity: 0.5;
+    }
+
+    .wrap {
+      max-width: 620px;
+      margin: 0 auto;
+    }
+
+    /* ── HEADER ───────────────────────────────────────── */
+    header {
+      margin-bottom: 44px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .eyebrow {
+      font-size: 9px;
+      letter-spacing: 0.35em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .eyebrow::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    h1 {
+      font-family: var(--serif);
+      font-size: 46px;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .tagline {
+      margin-top: 10px;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── CARD ─────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+      margin-bottom: 14px;
+    }
+
+    .card-label {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── FORM ─────────────────────────────────────────── */
+    .field { margin-bottom: 18px; }
+    .field:last-of-type { margin-bottom: 0; }
+
+    .field label {
+      display: block;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .field input[type="text"],
+    .field input[type="email"],
+    .field input[type="password"],
+    .field input[type="url"],
+    .field input[type="date"],
+    .field input[type="number"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--muted); opacity: 0.45; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+    /* ── TIME SLOTS ───────────────────────────────────── */
+    .slot-hint {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .slots { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    input.slot-cb { display: none; }
+
+    .slot-pill {
+      display: block;
+      padding: 7px 13px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.12s;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    input.slot-cb:checked + .slot-pill {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    /* ── BUTTONS ──────────────────────────────────────── */
+    .btn {
+      width: 100%;
+      padding: 15px 20px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+
+    .btn-connect {
+      background: var(--accent);
+      color: #09090b;
+      margin-top: 22px;
+    }
+    .btn-connect:hover:not(:disabled) { opacity: 0.88; }
+    .btn-connect:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-start {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .btn-start:hover { background: var(--accent-dim); }
+
+    .btn-stop {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+    .btn-stop:hover { background: var(--danger-dim); }
+
+    /* ── STATUS DISPLAY ───────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .dot.hunting {
+      background: var(--accent);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    .dot.secured { background: var(--success); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(201, 165, 106, 0.4); }
+      50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(201, 165, 106, 0); }
+    }
+
+    .status-label {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      color: var(--text);
+      transition: color 0.3s;
+    }
+
+    .status-label.hunting { color: var(--accent); }
+    .status-label.secured { color: var(--success); }
+
+    /* ── STATS ────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .stat-val {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    /* ── LOG ──────────────────────────────────────────── */
+    .log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      height: 210px;
+      overflow-y: auto;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 14px;
+      line-height: 1.9;
+      font-size: 11px;
+    }
+
+    .log-ts { color: var(--muted); flex-shrink: 0; font-size: 10px; }
+    .log-msg { color: var(--text); }
+    .log-msg.ok  { color: var(--success); }
+    .log-msg.err { color: var(--danger); }
+    .log-msg.hot { color: var(--accent); font-weight: 500; }
+
+    .log::-webkit-scrollbar { width: 3px; }
+    .log::-webkit-scrollbar-track { background: var(--bg); }
+    .log::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* ── ALERTS ───────────────────────────────────────── */
+    .alert {
+      padding: 11px 14px;
+      font-size: 11px;
+      margin-bottom: 16px;
+      line-height: 1.6;
+      border-left: 2px solid;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-err  { border-color: var(--danger);  color: var(--danger);  background: var(--danger-dim); }
+    .alert-info { border-color: var(--accent);  color: var(--accent);  background: var(--accent-dim); }
+
+    /* ── RECONFIGURE LINK ─────────────────────────────── */
+    .reconfig {
+      display: block;
+      text-align: center;
+      margin-top: 14px;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-decoration: none;
+      text-transform: uppercase;
+      cursor: pointer;
+      background: none;
+      border: none;
+      width: 100%;
+    }
+    .reconfig:hover { color: var(--text); }
+
+    /* ── SUCCESS OVERLAY ──────────────────────────────── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 9, 11, 0.96);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      backdrop-filter: blur(6px);
+      padding: 20px;
+      display: none;
+    }
+
+    #overlay.show { display: flex; }
+
+    .success-box {
+      border: 1px solid var(--success);
+      padding: 52px 44px;
+      text-align: center;
+      max-width: 380px;
+      width: 100%;
+    }
+
+    .success-kicker {
+      font-size: 9px;
+      letter-spacing: 0.35em;
+      color: var(--success);
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+
+    .success-h {
+      font-family: var(--serif);
+      font-size: 44px;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+      color: var(--text);
+    }
+
+    .success-detail {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 2.2;
+    }
+
+    .success-detail strong { color: var(--text); }
+    .success-detail .conf  { color: var(--success); }
+
+    /* ── UTILITY ──────────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.4);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Walker's Point · Milwaukee</div>
+    <h1>1033 Omakase</h1>
+    <p class="tagline">Reservation Sniper &mdash; Party of 2</p>
+  </header>
+
+  <!-- ── CONFIG CARD ─────────────────────────────────── -->
+  <div class="card" id="config-card">
+    <div class="card-label">Setup</div>
+
+    <div class="alert alert-info" id="config-info"></div>
+    <div class="alert alert-err"  id="config-err"></div>
+
+    <div class="field">
+      <label>Cloudflare Worker Proxy URL</label>
+      <input type="url" id="proxy-url" placeholder="https://omakase-sniper.yourname.workers.dev" />
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label>Resy Email</label>
+        <input type="email" id="resy-email" placeholder="you@email.com" />
+      </div>
+      <div class="field">
+        <label>Resy Password</label>
+        <input type="password" id="resy-password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label>Search From</label>
+        <input type="date" id="date-from" />
+      </div>
+      <div class="field">
+        <label>Search To</label>
+        <input type="date" id="date-to" />
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="slot-hint">Preferred time slots (deselect any you can't do)</div>
+      <div class="slots">
+        <div><input type="checkbox" class="slot-cb" id="s-500"  value="17:00:00" checked><label class="slot-pill" for="s-500">5:00 pm</label></div>
+        <div><input type="checkbox" class="slot-cb" id="s-530"  value="17:30:00" checked><label class="slot-pill" for="s-530">5:30 pm</label></div>
+        <div><input type="checkbox" class="slot-cb" id="s-630"  value="18:30:00" checked><label class="slot-pill" for="s-630">6:30 pm</label></div>
+        <div><input type="checkbox" class="slot-cb" id="s-645"  value="18:45:00" checked><label class="slot-pill" for="s-645">6:45 pm</label></div>
+        <div><input type="checkbox" class="slot-cb" id="s-800"  value="20:00:00" checked><label class="slot-pill" for="s-800">8:00 pm</label></div>
+      </div>
+    </div>
+
+    <div class="row-2" style="margin-top:18px;">
+      <div class="field">
+        <label>Party Size</label>
+        <input type="number" id="party-size" value="2" min="1" max="10" />
+      </div>
+      <div class="field">
+        <label>Poll Interval (seconds)</label>
+        <input type="number" id="poll-interval" value="30" min="10" max="300" />
+      </div>
+    </div>
+
+    <button class="btn btn-connect" id="connect-btn" onclick="connect()">
+      Authenticate &amp; Connect
+    </button>
+  </div>
+
+  <!-- ── SNIPER CARD ─────────────────────────────────── -->
+  <div class="card hidden" id="sniper-card">
+    <div class="card-label">Status</div>
+
+    <div class="status-row">
+      <div class="dot" id="dot"></div>
+      <div class="status-label" id="status-label">Idle</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Checks Run</div>
+        <div class="stat-val" id="s-checks">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Last Check</div>
+        <div class="stat-val" id="s-last">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Interval</div>
+        <div class="stat-val" id="s-interval">30s</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Party Size</div>
+        <div class="stat-val" id="s-party">2</div>
+      </div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <button class="btn btn-start" id="btn-start" onclick="startHunt()">▶ &nbsp;Begin Hunt</button>
+    <button class="btn btn-stop hidden" id="btn-stop" onclick="stopHunt()">■ &nbsp;Stop</button>
+
+    <button class="reconfig" onclick="goBack()">↩ reconfigure</button>
+  </div>
+
+</div>
+
+<!-- ── SUCCESS OVERLAY ─────────────────────────────── -->
+<div id="overlay">
+  <div class="success-box">
+    <div class="success-kicker">✓ &nbsp;Reservation Secured</div>
+    <div class="success-h">You're in.</div>
+    <div class="success-detail" id="overlay-detail">Loading…</div>
+  </div>
+</div>
+
+<script>
+  /* ─────────────────────────────────────────────────────
+     Constants
+  ───────────────────────────────────────────────────── */
+  const RESY_API_KEY  = 'VbWk7s3L4KiK5fzlO7JD3Q5Bu3a6VuWv';
+  const VENUE_SLUG    = '1033-omakase';
+  const VENUE_CITY    = 'milwaukee-wi';
+  function PARTY_SIZE() { return parseInt(document.getElementById('party-size').value) || 2; }
+
+  /* ─────────────────────────────────────────────────────
+     State
+  ───────────────────────────────────────────────────── */
+  const s = {
+    token:     null,
+    paymentId: null,
+    venueId:   null,
+    hunting:   false,
+    timer:     null,
+    checks:    0,
+  };
+
+  /* ─────────────────────────────────────────────────────
+     Default dates (today → 60 days out)
+  ───────────────────────────────────────────────────── */
+  (function initDates() {
+    const pad  = n => String(n).padStart(2, '0');
+    const fmt  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const from = new Date();
+    const to   = new Date(); to.setDate(to.getDate() + 60);
+    document.getElementById('date-from').value = fmt(from);
+    document.getElementById('date-to').value   = fmt(to);
+  })();
+
+  /* ─────────────────────────────────────────────────────
+     API helpers
+  ───────────────────────────────────────────────────── */
+  function proxy() {
+    return document.getElementById('proxy-url').value.trim().replace(/\/$/, '');
+  }
+
+  async function resyFetch(path, opts = {}) {
+    const url = proxy() + path;
+    const headers = {
+      'Authorization': `ResyAPI api_key="${RESY_API_KEY}"`,
+      'Content-Type':  opts.ct || 'application/json',
+      ...(s.token ? { 'X-Resy-Auth-Token': s.token } : {}),
+    };
+
+    const res = await fetch(url, {
+      method:  opts.method || 'GET',
+      headers,
+      body:    opts.body,
+    });
+
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  }
+
+  /* ─────────────────────────────────────────────────────
+     CONNECT
+  ───────────────────────────────────────────────────── */
+  async function connect() {
+    const proxyUrl  = proxy();
+    const email     = document.getElementById('resy-email').value.trim();
+    const password  = document.getElementById('resy-password').value;
+
+    if (!proxyUrl || !email || !password) {
+      return showAlert('config-err', 'Please fill in all fields.');
+    }
+
+    clearAlerts();
+    const btn = document.getElementById('connect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+
+    try {
+      // 1 — Authenticate
+      const auth = await resyFetch('/3/auth/password', {
+        method: 'POST',
+        ct:     'application/x-www-form-urlencoded',
+        body:   new URLSearchParams({ email, password }).toString(),
+      });
+
+      s.token     = auth.token;
+      s.paymentId = auth.payment_method_id;
+
+      if (!s.token) throw new Error('No auth token returned. Check credentials.');
+
+      // 2 — Resolve venue ID
+      let vData;
+      try {
+        vData = await resyFetch(`/3/venue?url_slug=${VENUE_SLUG}&location=${VENUE_CITY}`);
+        s.venueId = vData?.id?.resy ?? vData?.venue_id ?? vData?.id;
+      } catch (e) {
+        // Fallback: venue lookup path may vary; try alternate
+        try {
+          const search = await resyFetch(`/3/venues/search?query=${encodeURIComponent('1033 omakase')}&geo[lat]=43.03&geo[long]=-87.92`);
+          const match = search?.venues?.[0];
+          s.venueId = match?.id?.resy ?? match?.id;
+        } catch (_) {}
+      }
+
+      if (!s.venueId) {
+        throw new Error(`Could not auto-resolve venue ID. You may need to manually enter it (see README).`);
+      }
+
+      // 3 — Request browser notifications
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
+      const interval = parseInt(document.getElementById('poll-interval').value) || 30;
+      document.getElementById('s-interval').textContent = `${interval}s`;
+      document.getElementById('s-party').textContent = PARTY_SIZE();
+
+      // Show sniper panel
+      document.getElementById('config-card').classList.add('hidden');
+      document.getElementById('sniper-card').classList.remove('hidden');
+
+      log(`Authenticated as ${email}`, 'ok');
+      log(`Venue resolved → ID ${s.venueId}`, 'ok');
+      log(`Ready. Press Begin Hunt to start monitoring.`);
+
+    } catch (err) {
+      showAlert('config-err', err.message);
+      btn.disabled = false;
+      btn.textContent = 'Authenticate & Connect';
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────
+     HUNT
+  ───────────────────────────────────────────────────── */
+  function startHunt() {
+    s.hunting = true;
+    s.checks  = 0;
+    setStatus('hunting');
+    document.getElementById('btn-start').classList.add('hidden');
+    document.getElementById('btn-stop').classList.remove('hidden');
+
+    const interval = (parseInt(document.getElementById('poll-interval').value) || 30) * 1000;
+    log(`Hunt started. Polling every ${interval/1000}s across available dates.`);
+
+    runCheck();
+    s.timer = setInterval(runCheck, interval);
+  }
+
+  function stopHunt() {
+    s.hunting = false;
+    clearInterval(s.timer);
+    s.timer = null;
+    setStatus('idle');
+    document.getElementById('btn-stop').classList.add('hidden');
+    document.getElementById('btn-start').classList.remove('hidden');
+    log('Hunt paused.');
+  }
+
+  /* ─────────────────────────────────────────────────────
+     AVAILABILITY CHECK
+  ───────────────────────────────────────────────────── */
+  async function runCheck() {
+    if (!s.hunting) return;
+
+    const dates   = getDateRange();
+    const slots   = getSelectedSlots();
+    s.checks++;
+
+    document.getElementById('s-checks').textContent = s.checks;
+    document.getElementById('s-last').textContent   = now();
+
+    let found = false;
+
+    for (const date of dates) {
+      if (!s.hunting || found) break;
+      try {
+        const data   = await resyFetch(`/4/find?lat=0&long=0&day=${date}&party_size=${PARTY_SIZE()}&venue_id=${s.venueId}`);
+        const venues = data?.results?.venues ?? [];
+        if (!venues.length) continue;
+
+        const available = (venues[0]?.slots ?? []).filter(slot => {
+          const startTime = (slot?.date?.start ?? '').split(' ')[1]; // "HH:MM:SS"
+          return slots.length === 0 || slots.includes(startTime);
+        });
+
+        if (available.length > 0) {
+          log(`🎯 Slot found — ${date} at ${fmtSlotTime(available[0])}. Booking now…`, 'hot');
+          found = true;
+          await book(available[0], date);
+        }
+      } catch (err) {
+        log(`Error on ${date}: ${err.message}`, 'err');
+      }
+    }
+
+    if (!found) {
+      log(`Check #${s.checks} — no slots across ${dates.length} dates.`);
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────
+     BOOK
+  ───────────────────────────────────────────────────── */
+  async function book(slot, date) {
+    try {
+      const configId = slot?.config?.id;
+      if (!configId) throw new Error('No config ID in slot response');
+
+      // Step 1: get book token
+      const details = await resyFetch('/3/details', {
+        method: 'POST',
+        body: JSON.stringify({
+          commit:     1,
+          config_id:  configId,
+          day:        date,
+          party_size: PARTY_SIZE(),
+        }),
+      });
+
+      const bookToken = details?.book_token?.value;
+      if (!bookToken) throw new Error('No book token in details response');
+
+      log('Book token received. Submitting reservation…', 'hot');
+
+      // Step 2: book it
+      const booking = await resyFetch('/3/book', {
+        method: 'POST',
+        body: JSON.stringify({
+          book_token:             bookToken,
+          source_id:              'resy.com-venue-details',
+          payment_method_id:      s.paymentId,
+          replace_payment_method: false,
+        }),
+      });
+
+      onSuccess(booking, date, slot);
+
+    } catch (err) {
+      log(`Booking failed: ${err.message} — will retry on next cycle.`, 'err');
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────
+     SUCCESS
+  ───────────────────────────────────────────────────── */
+  function onSuccess(booking, date, slot) {
+    stopHunt();
+    setStatus('secured');
+
+    const slotTime = fmtSlotTime(slot);
+    const dateStr  = fmtDate(date);
+    const confId   = booking?.reservation_id ?? booking?.resy_token ?? booking?.token ?? '✓';
+
+    // Desktop notification
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification('🍣 Table Secured!', {
+          body: `1033 Omakase · ${dateStr} at ${slotTime} for 2`,
+        });
+      } catch (_) {}
+    }
+
+    // Play a tone
+    playTone();
+
+    // Show overlay
+    document.getElementById('overlay-detail').innerHTML =
+      `<strong>${dateStr}</strong><br>` +
+      `${slotTime} &nbsp;·&nbsp; Party of ${PARTY_SIZE()}<br><br>` +
+      `<span class="conf">Confirmation: ${confId}</span><br><br>` +
+      `Check your email for the Resy confirmation.`;
+    // Update tagline party size
+    document.querySelector('.tagline').textContent = `Reservation Sniper — Party of ${PARTY_SIZE()}`;
+
+    document.getElementById('overlay').classList.add('show');
+    log(`Booked! Conf: ${confId}`, 'ok');
+  }
+
+  /* ─────────────────────────────────────────────────────
+     HELPERS
+  ───────────────────────────────────────────────────── */
+  function goBack() {
+    stopHunt();
+    document.getElementById('config-card').classList.remove('hidden');
+    document.getElementById('sniper-card').classList.add('hidden');
+    const btn = document.getElementById('connect-btn');
+    btn.disabled = false;
+    btn.textContent = 'Authenticate & Connect';
+  }
+
+  function getDateRange() {
+    const from  = new Date(document.getElementById('date-from').value + 'T12:00:00');
+    const to    = new Date(document.getElementById('date-to').value   + 'T12:00:00');
+    const dates = [];
+    const cur   = new Date(from);
+    while (cur <= to) {
+      const dow = cur.getDay(); // 0=Sun, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+      if (dow >= 2 && dow <= 6) {
+        const pad = n => String(n).padStart(2,'0');
+        dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+
+  function getSelectedSlots() {
+    return [...document.querySelectorAll('.slot-cb:checked')].map(el => el.value);
+  }
+
+  function setStatus(status) {
+    const dot   = document.getElementById('dot');
+    const label = document.getElementById('status-label');
+    dot.className   = `dot ${status}`;
+    label.className = `status-label ${status}`;
+    label.textContent = { idle: 'Idle', hunting: 'Hunting', secured: 'Secured' }[status];
+  }
+
+  function log(msg, cls = '') {
+    const el    = document.getElementById('log');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-ts">${now()}</span><span class="log-msg ${cls}">${msg}</span>`;
+    el.appendChild(entry);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function fmtSlotTime(slot) {
+    const start = (slot?.date?.start ?? '').split(' ')[1] ?? '';
+    const [h, m] = start.split(':').map(Number);
+    if (isNaN(h)) return 'TBD';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12  = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+
+  function fmtDate(dateStr) {
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    });
+  }
+
+  function showAlert(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function clearAlerts() {
+    document.querySelectorAll('.alert').forEach(el => el.classList.remove('show'));
+  }
+
+  function playTone() {
+    try {
+      const ctx  = new AudioContext();
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+      [440, 554, 659].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.connect(gain);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        osc.start(ctx.currentTime + i * 0.18);
+        osc.stop(ctx.currentTime + i * 0.18 + 1.2);
+      });
+    } catch (_) {}
+  }
+</script>
+</body>
+</html>
